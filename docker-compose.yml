@@ -1,0 +1,100 @@
+version: "3.1"
+
+# Required Environment Variables:
+# TIMEZONE - Current timezone in America/New_York format
+# ROOT_DIR - The directory where you cloned this repository
+# PRIVATE_KEY - Your nordvpn private key
+# !!The UID variable will be inserted by the script
+
+services:
+  # https://github.com/linuxserver/docker-plex
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    network_mode: host
+    environment:
+      - PUID=${UID}
+      - PGID=13000
+      - VERSION=docker
+    volumes:
+      - ${ROOT_DIR}/docker/plex-config:/config
+      - ${ROOT_DIR}/data/media:/data/media
+    restart: unless-stopped
+  # https://github.com/linuxserver/docker-radarr
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=13002
+      - PGID=13000
+      - UMASK=002
+      - TZ=${TIMEZONE}
+    volumes:
+      - ${ROOT_DIR}/docker/radarr-config:/config
+      - ${ROOT_DIR}/data:/data
+    ports:
+      - 7878:7878
+    restart: unless-stopped
+  # https://github.com/linuxserver/docker-sonarr
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=13001
+      - PGID=13000
+      - UMASK=002
+      - TZ=${TIMEZONE}
+    volumes:
+      - ${ROOT_DIR}/docker/sonarr-config:/config
+      - ${ROOT_DIR}/data:/data
+    ports:
+      - 8989:8989
+    restart: unless-stopped
+  # https://github.com/linuxserver/docker-prowlarr
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:develop
+    container_name: prowlarr
+    environment:
+      - PUID=13006
+      - PGID=13000
+      - UMASK=002
+      - TZ=${TIMEZONE}
+    volumes:
+      - ${ROOT_DIR}/docker/prowlarr-config:/config
+    ports:
+      - 9696:9696
+    restart: unless-stopped
+  # https://github.com/bubuntux/nordlynx
+  nordlynx:
+    image: ghcr.io/bubuntux/nordlynx
+    container_name: nordlynx
+    cap_add:
+      - NET_ADMIN #required
+    environment:
+      - PRIVATE_KEY=${PRIVATE_KEY} #required
+      - NET_LOCAL=192.168.1.0/24
+      - TZ=America/New_York
+    ports:
+      - 8080:8080
+      - 6881:6881
+      - 6881:6881/udp
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1  # Recomended if using ipv4 only
+  # https://github.com/linuxserver/docker-qbittorrent
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: service:nordlynx
+    depends_on:
+      - nordlynx
+    environment:
+      - PUID=13007
+      - PGID=13000
+      - UMASK=002
+      - TZ=${TIMEZONE}
+      - WEBUI_PORT=8080
+    volumes:
+      - ${ROOT_DIR}/docker/qbittorrent-config:/config
+      - ${ROOT_DIR}/data/torrents:/data/torrents
+    restart: unless-stopped
+
